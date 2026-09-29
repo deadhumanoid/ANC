@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Maternal Care Coordinator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Vadodara:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site">
+    <div class="inner">
+      <div class="brand"><strong data-i18n="appName"></strong><span data-i18n="phcName"></span></div>
+      <nav id="nav">
+        <button data-role="asha" data-i18n="navAsha"></button>
+        <button data-role="doctor" data-i18n="navDoctor"></button>
+        <button data-role="admin" data-i18n="navAdmin"></button>
+        <button data-role="sms" data-i18n="navSms"></button>
+      </nav>
+      <button id="lang" class="lang" lang="gu"></button>
+    </div>
+  </header>
+
+  <main id="main" class="inner"></main>
+
+  <footer class="inner">
+    <p data-i18n="protoNote"></p>
+  </footer>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="js/i18n.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
