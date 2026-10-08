@@ -12,6 +12,21 @@ Either:
 - open `index.html` in a browser, or
 - enable GitHub Pages for the repository (Settings → Pages → deploy from the `main` branch, root folder) and open the published link.
 
+## FastAPI backend
+
+The backend lives in `backend/` and provides a REST API for pregnancies, ANC visits, risk rules, PHC coverage, doctor reviews, and the simulated SMS log. The static frontend above remains the original in-memory prototype and is not connected to the API yet.
+
+```powershell
+py -m venv .venv
+.venv\Scripts\Activate.ps1
+py -m pip install -r requirements.txt
+py -m uvicorn backend.main:app --reload
+```
+
+Open `http://127.0.0.1:8000/docs` for the interactive API. The default SQLite database is created at `backend/anc.db`; copy `.env.example` to `.env` and set `DATABASE_URL` to use MySQL (`mysql+pymysql://...`). The API seeds staff accounts and editable risk thresholds on first startup, but does not seed any mother/pregnancy records. Run tests with `py -m pytest`.
+
+This is a development backend, not a production clinical system: authentication and role-based authorization are not implemented, and SMS delivery is simulated. Risk thresholds are illustrative and are not clinical guidance.
+
 ## What each user can do
 
 | Role | Features |
