@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from backend.models import ANCVisit, Mother, Pregnancy, RiskRule, SmsLog, Village
 
 
+# Visit weeks and rule definitions are the defaults used to seed a new database.
 ANC_WEEKS = (12, 20, 28, 36)
 DEFAULT_RULES = (
     ("r1", "bp_sys", ">=", 140, "u_mmHg", "high", "r_highbp"),
@@ -27,11 +28,12 @@ DEFAULT_VILLAGES = (
 
 
 def new_id(prefix: str) -> str:
+    # Prefixes make IDs easier to recognize in logs while UUIDs keep them unique.
     return f"{prefix}_{uuid4().hex}"
 
 
 def seed_defaults(db: Session) -> None:
-    # Seed stable reference data and clearly labeled demo records for an empty install.
+    # Seed reference data on every startup, but never overwrite administrator-edited rules.
     if not db.get(RiskRule, "r1"):
         db.add_all([
             RiskRule(id=rule[0], param=rule[1], op=rule[2], value=rule[3], unit=rule[4], sev=rule[5], reason=rule[6])
@@ -54,6 +56,7 @@ def seed_defaults(db: Session) -> None:
             db.add(User(id=user_id, role=role, name=name, village=village))
     db.commit()
 
+    # Use recognizable fictional data only for a completely empty patient database.
     if db.scalar(select(Mother.id).limit(1)) is None:
         today = date.today()
         demo_mothers = (
@@ -87,6 +90,7 @@ def seed_defaults(db: Session) -> None:
 
 
 def send_sms(db: Session, recipient: str, kind: str, message_key: str, variables: dict, alert: bool = False) -> None:
+    # Store a template key and variables for localized display; no SMS gateway is called.
     db.add(SmsLog(
         id=new_id("sms"), created_at=datetime.now(timezone.utc).replace(tzinfo=None),
         recipient=recipient, kind=kind, message_key=message_key, variables=variables, alert=alert,
@@ -94,6 +98,7 @@ def send_sms(db: Session, recipient: str, kind: str, message_key: str, variables
 
 
 def visit_status(visit: ANCVisit, today: date | None = None) -> str:
+    # Accept an explicit date so callers and tests can evaluate status deterministically.
     today = today or date.today()
     if visit.actual_date:
         return "done"
@@ -105,6 +110,7 @@ def visit_status(visit: ANCVisit, today: date | None = None) -> str:
 
 
 def risk_hits(db: Session, mother: Mother, visit: ANCVisit | None) -> list[dict]:
+    # Age is always available; clinical readings remain absent until a visit is recorded.
     readings = {
         "age": mother.age,
         "bp_sys": visit.bp_sys if visit else None,
@@ -116,6 +122,7 @@ def risk_hits(db: Session, mother: Mother, visit: ANCVisit | None) -> list[dict]
         value = readings[rule.param]
         if value is None:
             continue
+        # Rule operators are stored as data so thresholds can be edited without code changes.
         triggered = value >= rule.value if rule.op == ">=" else value > rule.value if rule.op == ">" else value < rule.value
         if triggered:
             hits.append({"id": rule.id, "param": rule.param, "sev": rule.sev, "reason": rule.reason, "value": value})
@@ -129,6 +136,7 @@ def risk_hits(db: Session, mother: Mother, visit: ANCVisit | None) -> list[dict]
 
 
 def pregnancy_assessment(db: Session, pregnancy: Pregnancy) -> dict:
+    # Only the latest completed visit contributes readings to the current assessment.
     completed = [visit for visit in pregnancy.visits if visit.actual_date]
     latest = max(completed, key=lambda visit: visit.no, default=None)
     hits = risk_hits(db, pregnancy.mother, latest)
@@ -137,6 +145,7 @@ def pregnancy_assessment(db: Session, pregnancy: Pregnancy) -> dict:
 
 
 def generate_schedule(lmp: date, edd: date, today: date | None = None) -> list[date]:
+    # Late registrations start today; later visits retain the intended spacing and EDD bound.
     today = today or date.today()
     dates: list[date] = []
     for week in ANC_WEEKS:

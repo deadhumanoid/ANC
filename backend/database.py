@@ -5,6 +5,7 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 
+# Keep local development self-contained while allowing deployments to supply another DB URL.
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./backend/anc.db")
 engine_options = {"pool_pre_ping": True}
 if DATABASE_URL.startswith("sqlite"):
@@ -14,6 +15,7 @@ if DATABASE_URL.startswith("sqlite"):
         # Keep an in-memory test database alive across separate sessions.
         engine_options["poolclass"] = StaticPool
 
+# The same engine is shared by request-scoped sessions created below.
 engine = create_engine(DATABASE_URL, **engine_options)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 

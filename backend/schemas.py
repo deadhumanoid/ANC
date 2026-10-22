@@ -4,7 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
-# These request and response contracts validate API data independently of DB tables.
+# These API contracts validate incoming data independently from SQLAlchemy's table definitions.
 class MotherCreate(BaseModel):
     name: str | dict[str, str]
     age: int = Field(ge=12, le=55)
@@ -15,6 +15,8 @@ class MotherCreate(BaseModel):
 
 
 class PregnancyCreate(BaseModel):
+    """A mother registration and the pregnancy dates/history needed to schedule ANC."""
+
     mother: MotherCreate
     lmp: date
     gravida: int = Field(default=1, ge=1)
@@ -22,6 +24,8 @@ class PregnancyCreate(BaseModel):
 
 
 class VisitRecord(BaseModel):
+    """Measurements submitted when an ASHA worker completes a scheduled visit."""
+
     bp_sys: int = Field(ge=60, le=250)
     bp_dia: int = Field(ge=30, le=160)
     hb: float = Field(gt=2, le=20)
@@ -30,6 +34,8 @@ class VisitRecord(BaseModel):
 
 
 class ReviewCreate(BaseModel):
+    """A doctor's allowed decision and the note attached to it."""
+
     by_id: str
     decision: Literal["dRoutine", "dPhc", "dRefer"]
     text: str = Field(min_length=1, max_length=2000)

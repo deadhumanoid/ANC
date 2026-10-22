@@ -18,7 +18,7 @@ from backend.schemas import PregnancyCreate, RiskRuleOut, RiskRuleUpdate, Review
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    # Prepare tables and demo reference data before accepting API requests.
+    # Prepare the schema and seed defaults once before the server accepts requests.
     Base.metadata.create_all(bind=engine)
     with next(get_db()) as db:
         seed_defaults(db)
@@ -28,7 +28,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Maternal Care Coordinator API", version="1.0.0", lifespan=lifespan)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173,http://localhost:5500,http://127.0.0.1:5500")
-# The browser frontend runs on a different local port, so allow its origin explicitly.
+# CORS is retained for optional separate frontend servers; the bundled UI uses the same origin.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in origins.split(",") if origin.strip()],
@@ -69,6 +69,7 @@ def pregnancy_json(db: Session, pregnancy: Pregnancy) -> dict:
         "parity": pregnancy.parity,
         "status": pregnancy.status,
         "reviewed": pregnancy.reviewed,
+        # Compute gestational age at response time rather than storing a value that goes stale.
         "gestational_week": (date.today() - pregnancy.lmp).days // 7,
         "risk": pregnancy_assessment(db, pregnancy),
         "visits": [visit_json(visit) for visit in pregnancy.visits],
@@ -109,6 +110,7 @@ def list_pregnancies(
     asha_id: str | None = None,
     db: Session = Depends(get_db),
 ):
+    # Load the relations needed for each UI card before shaping the API response.
     query = select(Pregnancy).options(joinedload(Pregnancy.mother), joinedload(Pregnancy.visits))
     if status != "all":
         query = query.where(Pregnancy.status == status)
@@ -133,6 +135,7 @@ def create_pregnancy(payload: PregnancyCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=422, detail="asha_id must identify an ASHA worker")
     if not db.get(Village, payload.mother.village):
         raise HTTPException(status_code=422, detail="village must be selected from the supported village list")
+    # Prevent a second active pregnancy from being registered against the same phone.
     duplicate = db.scalar(
         select(Mother).join(Pregnancy).where(
             Mother.phone == payload.mother.phone, Pregnancy.status == "active"
@@ -151,6 +154,7 @@ def create_pregnancy(payload: PregnancyCreate, db: Session = Depends(get_db)):
         id=new_id("p"), mother=mother, lmp=payload.lmp, edd=edd,
         gravida=payload.gravida, parity=payload.parity, status="active", reviewed=False,
     )
+    # Build the scheduled visit rows before committing the mother/pregnancy together.
     pregnancy.visits = [
         ANCVisit(id=new_id("v"), no=index, scheduled_date=scheduled, notes="")
         for index, scheduled in enumerate(generate_schedule(payload.lmp, edd, today), start=1)
@@ -180,6 +184,7 @@ def record_visit(visit_id: str, payload: VisitRecord, db: Session = Depends(get_
     assessment = pregnancy_assessment(db, pregnancy)
     mother = pregnancy.mother
     if assessment["level"] == "high":
+        # A new high-risk result reopens the case even if a previous review existed.
         pregnancy.reviewed = False
         send_sms(db, "u3", "k_alert", "m_alert", {
             "name": mother.name, "village": {"k": f"v_{mother.village}"},
@@ -207,6 +212,7 @@ def create_review(pregnancy_id: str, payload: ReviewCreate, db: Session = Depend
     )
     pregnancy.reviewed = True
     mother = pregnancy.mother
+    # Notify the mother only when the selected decision needs a follow-up visit/referral.
     if payload.decision == "dRefer":
         send_sms(db, mother.phone, "k_referral", "m_referral", {"name": {lang: text.split()[0] for lang, text in mother.name.items()}})
     elif payload.decision == "dPhc":
@@ -241,6 +247,7 @@ def get_summary(db: Session = Depends(get_db)):
         select(Pregnancy).options(joinedload(Pregnancy.mother), joinedload(Pregnancy.visits)).where(Pregnancy.status == "active")
     ).unique().all()
     visits = [visit for pregnancy in pregnancies for visit in pregnancy.visits]
+    # Coverage counts only visits whose scheduled date has arrived.
     by_visit = []
     for number in range(1, 5):
         due = [visit for visit in visits if visit.no == number and visit.scheduled_date <= date.today()]
@@ -268,6 +275,7 @@ def run_reminders(db: Session = Depends(get_db)):
     pregnancies = db.scalars(
         select(Pregnancy).options(joinedload(Pregnancy.mother), joinedload(Pregnancy.visits)).where(Pregnancy.status == "active")
     ).unique().all()
+    # Each visit's markers make repeated daily runs idempotent.
     reminders = missed_notices = 0
     for pregnancy in pregnancies:
         mother = pregnancy.mother
@@ -292,6 +300,7 @@ def run_reminders(db: Session = Depends(get_db)):
 
 @app.get("/", include_in_schema=False)
 def frontend():
+    # Serve the bundled UI from the same origin as /api, avoiding local CORS setup.
     return FileResponse(PROJECT_ROOT / "index.html")
 
 

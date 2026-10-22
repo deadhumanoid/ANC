@@ -5,6 +5,7 @@ const main = document.getElementById('main');
 const UI = { page: 'home', pid: null, visitId: null, flash: null };
 
 function go(page, opts = {}) {
+  // Reset transient page state unless the caller supplies a pregnancy or visit to open.
   Object.assign(UI, { page, pid: null, visitId: null, flash: null }, opts);
   render();
   window.scrollTo(0, 0);
@@ -36,6 +37,7 @@ function readings(v, hits = []) {
 
 /* ---------- render ---------- */
 function render() {
+  // Shared navigation and language labels are refreshed before the active screen is drawn.
   document.documentElement.lang = LANG;
   document.title = STRINGS[LANG].appName;
   document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = STRINGS[LANG][el.dataset.i18n]; });
@@ -98,6 +100,7 @@ function renderAsha() {
 function renderCard() {
   const p = S.pregnancies.find(x => x.id === UI.pid);
   const m = motherOf(p), a = assess(p), vs = visitsOf(p);
+  // A visit form is shown only after the user explicitly chooses an unrecorded visit.
   const recVisit = UI.visitId ? vs.find(v => v.id === UI.visitId) : null;
   const isAsha = S.role === 'asha';
 
@@ -162,6 +165,7 @@ function recordForm(v, p) {
 function renderRegister() {
   const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const bloodGroups = ['Unknown', 'A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
+  // Village options come from the API, keeping the registration form aligned with server validation.
   main.innerHTML = `
     <button class="link back" data-go="home">${t('back')}</button>
     <h1>${t('btnRegister')}</h1>
@@ -357,6 +361,7 @@ function registerMother() {
 async function recordVisit(visitId) {
   const num = id => parseFloat(document.getElementById(id).value);
   try {
+    // The backend owns persistence and risk assessment; refresh before showing the updated card.
     const result = await apiRequest(`/visits/${visitId}/record`, {
       method: 'POST',
       body: JSON.stringify({
@@ -394,6 +399,7 @@ async function saveReview(pid) {
 
 async function runReminderJob() {
   try {
+    // The backend checks due/missed visits and records simulated messages in the database.
     const result = await apiRequest('/reminders/run', { method: 'POST' });
     await loadData();
     render();
@@ -434,6 +440,7 @@ function toast(html) {
 
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
+  // One delegated listener handles controls created dynamically during screen rendering.
   const el = e.target.closest('button');
   if (!el) return;
   if (el.id === 'retry-api') { startApp(); return; }

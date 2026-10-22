@@ -1,12 +1,11 @@
-// Sample data and domain logic.
-// Records mirror the Lab 3 classes: User, Mother, Pregnancy, ANCVisit, NotificationService.
-// Everything lives in memory; the backend will replace this file later.
+// Frontend data adapter: fetch persistent API records and convert them to UI-friendly shapes.
 
 const DAY = 86400000;
 const startOfDay = d => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
 const addDays = (d, n) => new Date(d.getTime() + n * DAY);
 const TODAY = startOfDay(new Date());
 
+// Same-origin requests let FastAPI serve both the UI and the API without a separate server.
 const API_ROOT = `${window.location.origin}/api`;
 const S = {
   role: 'asha',
@@ -96,6 +95,7 @@ async function apiRequest(path, options = {}) {
     ...options,
     headers: { 'Content-Type': 'application/json', ...options.headers }
   });
+  // Some successful endpoints have no body; parse JSON only when a response is present.
   const body = response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok) {
     let message = body?.detail;
@@ -107,12 +107,14 @@ async function apiRequest(path, options = {}) {
 }
 
 async function loadData() {
+  // Load independent resources together, then normalize API field names for existing UI code.
   const [users, pregnancies, sms, rules, villages] = await Promise.all([
     apiRequest('/users'), apiRequest('/pregnancies'), apiRequest('/sms'), apiRequest('/risk-rules'),
     apiRequest('/villages')
   ]);
   S.users = users;
   S.villages = villages;
+  // The API uses snake_case and nested records; the UI uses camelCase lookup relationships.
   S.pregnancies = pregnancies.map(p => ({
     id: p.id, motherId: p.mother.id, lmp: dateFromApi(p.lmp), edd: dateFromApi(p.edd),
     gravida: p.gravida, parity: p.parity, status: p.status, reviewed: p.reviewed,
