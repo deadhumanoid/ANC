@@ -1,20 +1,24 @@
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
 import os
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from backend.database import Base, engine, get_db
 from backend.domain import generate_schedule, new_id, pregnancy_assessment, seed_defaults, send_sms, visit_status
-from backend.models import ANCVisit, DoctorReview, Mother, Pregnancy, RiskRule, SmsLog, User
-from backend.schemas import PregnancyCreate, RiskRuleOut, RiskRuleUpdate, ReviewCreate, SmsOut, VisitRecord
+from backend.models import ANCVisit, DoctorReview, Mother, Pregnancy, RiskRule, SmsLog, User, Village
+from backend.schemas import PregnancyCreate, RiskRuleOut, RiskRuleUpdate, ReviewCreate, SmsOut, VisitRecord, VillageOut
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    # Prepare tables and demo reference data before accepting API requests.
     Base.metadata.create_all(bind=engine)
     with next(get_db()) as db:
         seed_defaults(db)
@@ -22,7 +26,9 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Maternal Care Coordinator API", version="1.0.0", lifespan=lifespan)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173,http://localhost:5500,http://127.0.0.1:5500")
+# The browser frontend runs on a different local port, so allow its origin explicitly.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in origins.split(",") if origin.strip()],
@@ -33,6 +39,7 @@ app.add_middleware(
 
 
 def get_pregnancy(db: Session, pregnancy_id: str) -> Pregnancy:
+    # Load related rows needed by the response while the session is open.
     pregnancy = db.scalar(
         select(Pregnancy).options(
             joinedload(Pregnancy.mother), joinedload(Pregnancy.visits), joinedload(Pregnancy.reviews)
@@ -44,6 +51,7 @@ def get_pregnancy(db: Session, pregnancy_id: str) -> Pregnancy:
 
 
 def pregnancy_json(db: Session, pregnancy: Pregnancy) -> dict:
+    # Shape ORM objects explicitly to avoid serializing relationship back-references.
     return {
         "id": pregnancy.id,
         "mother": {
@@ -90,6 +98,11 @@ def list_users(db: Session = Depends(get_db)):
     return db.scalars(select(User).order_by(User.role, User.id)).all()
 
 
+@app.get("/api/villages", response_model=list[VillageOut])
+def list_villages(db: Session = Depends(get_db)):
+    return db.scalars(select(Village).order_by(Village.id)).all()
+
+
 @app.get("/api/pregnancies")
 def list_pregnancies(
     status: str | None = Query(default="active", pattern="^(active|completed|all)$"),
@@ -112,11 +125,14 @@ def get_pregnancy_detail(pregnancy_id: str, db: Session = Depends(get_db)):
 @app.post("/api/pregnancies", status_code=201)
 def create_pregnancy(payload: PregnancyCreate, db: Session = Depends(get_db)):
     today = date.today()
+    # Reject dates outside the current pregnancy window before creating records.
     if payload.lmp > today or (today - payload.lmp).days > 280:
         raise HTTPException(status_code=422, detail="LMP must be within the current 40-week pregnancy window")
     asha = db.get(User, payload.mother.asha_id)
     if not asha or asha.role != "asha":
         raise HTTPException(status_code=422, detail="asha_id must identify an ASHA worker")
+    if not db.get(Village, payload.mother.village):
+        raise HTTPException(status_code=422, detail="village must be selected from the supported village list")
     duplicate = db.scalar(
         select(Mother).join(Pregnancy).where(
             Mother.phone == payload.mother.phone, Pregnancy.status == "active"
@@ -159,6 +175,7 @@ def record_visit(visit_id: str, payload: VisitRecord, db: Session = Depends(get_
     visit.actual_date = date.today()
     visit.bp_sys, visit.bp_dia = payload.bp_sys, payload.bp_dia
     visit.hb, visit.weight, visit.notes = payload.hb, payload.weight, payload.notes
+    # Make the new measurements visible to risk assessment before the final commit.
     db.flush()
     assessment = pregnancy_assessment(db, pregnancy)
     mother = pregnancy.mother
@@ -256,6 +273,7 @@ def run_reminders(db: Session = Depends(get_db)):
         mother = pregnancy.mother
         for visit in pregnancy.visits:
             status = visit_status(visit, today)
+            # Per-visit markers make this job safe to run repeatedly on the same day.
             if not visit.actual_date and status != "missed" and (visit.scheduled_date - today).days <= 3 and visit.reminded_on != today:
                 visit.reminded_on = today
                 reminders += 1
@@ -270,3 +288,12 @@ def run_reminders(db: Session = Depends(get_db)):
                 send_sms(db, mother.asha_id, "k_missed", "m_missedAsha", {"name": mother.name, "n": visit.no, "date": visit.scheduled_date.isoformat()})
     db.commit()
     return {"reminders_sent": reminders, "missed_notices_sent": missed_notices}
+
+
+@app.get("/", include_in_schema=False)
+def frontend():
+    return FileResponse(PROJECT_ROOT / "index.html")
+
+
+app.mount("/css", StaticFiles(directory=PROJECT_ROOT / "css"), name="css")
+app.mount("/js", StaticFiles(directory=PROJECT_ROOT / "js"), name="js")

@@ -7,31 +7,17 @@ const startOfDay = d => { const x = new Date(d); x.setHours(0, 0, 0, 0); return 
 const addDays = (d, n) => new Date(d.getTime() + n * DAY);
 const TODAY = startOfDay(new Date());
 
-let idCounter = 100;
-const newId = prefix => prefix + (++idCounter);
-
+const API_ROOT = `${window.location.origin}/api`;
 const S = {
   role: 'asha',
   me: { asha: 'u1', doctor: 'u3', admin: 'u4' },
-  users: [
-    { id: 'u1', role: 'asha', name: { en: 'Sunita Parmar', gu: 'સુનિતા પરમાર' }, village: 'bakrol' },
-    { id: 'u2', role: 'asha', name: { en: 'Jayshree Macwan', gu: 'જયશ્રી મેકવાન' }, village: 'gana' },
-    { id: 'u3', role: 'doctor', name: { en: 'Dr. Nirav Mehta', gu: 'ડૉ. નિરવ મહેતા' } },
-    { id: 'u4', role: 'admin', name: { en: 'Kalpana Desai', gu: 'કલ્પના દેસાઈ' } }
-  ],
+  users: [],
   mothers: [],
   pregnancies: [],
   visits: [],
   sms: [],
-  // RiskRule: configurable thresholds, not hard-coded if statements
-  rules: [
-    { id: 'r1', param: 'bpSys', op: '>=', value: 140, unit: 'u_mmHg', sev: 'high', reason: 'r_highbp' },
-    { id: 'r2', param: 'bpDia', op: '>=', value: 90, unit: 'u_mmHg', sev: 'high', reason: 'r_highbp' },
-    { id: 'r3', param: 'hb', op: '<', value: 7, unit: 'u_gdl', sev: 'high', reason: 'r_sevan' },
-    { id: 'r4', param: 'hb', op: '<', value: 10, unit: 'u_gdl', sev: 'moderate', reason: 'r_an' },
-    { id: 'r5', param: 'age', op: '<', value: 18, unit: 'u_yrs', sev: 'moderate', reason: 'r_teen' },
-    { id: 'r6', param: 'age', op: '>', value: 35, unit: 'u_yrs', sev: 'moderate', reason: 'r_old' }
-  ]
+  villages: [],
+  rules: []
 };
 
 // Four ANC contacts as per the national schedule (weeks from LMP)
@@ -99,70 +85,56 @@ function sendSms(to, kind, msg, vars = {}, alert = false) {
   S.sms.unshift({ at: new Date(), to, kind, msg, vars, alert });
 }
 
-/* ---------- sample data ---------- */
-function seed(mother, lmpDaysAgo, readings, extra = {}) {
-  const m = { id: newId('m'), bloodGroup: 'B+', ...mother };
-  S.mothers.push(m);
-  const lmp = addDays(TODAY, -lmpDaysAgo);
-  const p = {
-    id: newId('p'), motherId: m.id, lmp, edd: addDays(lmp, 280),
-    gravida: extra.g || 1, parity: extra.pa || 0, status: 'active',
-    reviewed: !!extra.reviewed, notes: extra.notes || []
-  };
-  S.pregnancies.push(p);
-  ANC_WEEKS.forEach((w, i) => {
-    const scheduled = addDays(lmp, w * 7);
-    const r = readings[i];
-    S.visits.push({
-      id: newId('v'), pregnancyId: p.id, no: i + 1, scheduledDate: scheduled,
-      actualDate: r ? addDays(scheduled, r.late || 0) : null,
-      weight: r?.weight, bpSys: r?.bp?.[0], bpDia: r?.bp?.[1], hb: r?.hb, notes: r?.notes || ''
-    });
-  });
-  return p;
+function dateFromApi(value) {
+  if (!value) return null;
+  const datePart = value.slice(0, 10);
+  return new Date(`${datePart}T00:00:00`);
 }
 
-const kavita = seed({ name: { en: 'Kavita Solanki', gu: 'કવિતા સોલંકી' }, age: 24, phone: '9824513306', village: 'bakrol', ashaId: 'u1', bloodGroup: 'O+' }, 212, [
-  { weight: 51, bp: [112, 72], hb: 11.2 },
-  { weight: 55, bp: [118, 78], hb: 10.8 },
-  { weight: 59, bp: [146, 94], hb: 10.9, late: 1, notes: { en: 'Mild swelling in feet', gu: 'પગમાં હળવો સોજો' } }
-]);
-seed({ name: { en: 'Rekha Vaghela', gu: 'રેખા વાઘેલા' }, age: 19, phone: '9726600418', village: 'bakrol', ashaId: 'u1' }, 146, [
-  { weight: 46, bp: [108, 70], hb: 9.2, notes: { en: 'IFA tablets given', gu: 'IFA ગોળીઓ આપી' } }
-]);
-seed({ name: { en: 'Hina Chauhan', gu: 'હિના ચૌહાણ' }, age: 28, phone: '9909134562', village: 'vadod', ashaId: 'u1', bloodGroup: 'A+' }, 98, [
-  { weight: 58, bp: [116, 74], hb: 11.6 }
-], { g: 2, pa: 1 });
-seed({ name: { en: 'Meena Parmar', gu: 'મીના પરમાર' }, age: 37, phone: '9638221790', village: 'bakrol', ashaId: 'u1', bloodGroup: 'AB+' }, 244, [
-  { weight: 60, bp: [120, 80], hb: 9.6 },
-  { weight: 63, bp: [122, 80], hb: 8.1 },
-  { weight: 65, bp: [124, 82], hb: 6.8, notes: { en: 'Complains of tiredness', gu: 'થાકની ફરિયાદ' } }
-], {
-  g: 3, pa: 2, reviewed: true,
-  notes: [{
-    at: addDays(TODAY, -20), by: 'u3', decision: 'dRefer',
-    text: { en: 'Severe anaemia at 32 weeks. Referred to CHC Anand for IV iron and a blood test.', gu: '32 અઠવાડિયે ગંભીર એનિમિયા. IV આયર્ન અને લોહીની તપાસ માટે CHC આણંદ રિફર કર્યા.' }
-  }]
-});
-const sonal = seed({ name: { en: 'Sonal Padhiyar', gu: 'સોનલ પઢિયાર' }, age: 26, phone: '9879045521', village: 'vadod', ashaId: 'u1' }, 250, [
-  { weight: 54, bp: [110, 70], hb: 11 },
-  { weight: 57, bp: [114, 72], hb: 11.3 },
-  { weight: 61, bp: [116, 76], hb: 11.1 }
-], { g: 2, pa: 1 });
-seed({ name: { en: 'Pooja Rathod', gu: 'પૂજા રાઠોડ' }, age: 21, phone: '9913370864', village: 'gana', ashaId: 'u2' }, 186, [
-  { weight: 49, bp: [110, 70], hb: 10.4 },
-  { weight: 53, bp: [112, 74], hb: 10.6 }
-]);
-seed({ name: { en: 'Nisha Makwana', gu: 'નિશા મકવાણા' }, age: 30, phone: '9724482017', village: 'gana', ashaId: 'u2', bloodGroup: 'B-' }, 70, []);
-seed({ name: { en: 'Bhavna Rohit', gu: 'ભાવના રોહિત' }, age: 17, phone: '9601157732', village: 'gana', ashaId: 'u2' }, 160, [
-  { weight: 44, bp: [104, 66], hb: 10.2 }
-]);
+async function apiRequest(path, options = {}) {
+  const response = await fetch(`${API_ROOT}${path}`, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', ...options.headers }
+  });
+  const body = response.status === 204 ? null : await response.json().catch(() => null);
+  if (!response.ok) {
+    let message = body?.detail;
+    if (Array.isArray(message)) message = message.map(item => item.msg).join('; ');
+    if (message && typeof message === 'object') message = message.message || JSON.stringify(message);
+    throw new Error(message || `API request failed (${response.status})`);
+  }
+  return body;
+}
 
-// keep one visit due this week so the demo always has something to record
-visitsOf(sonal)[3].scheduledDate = addDays(TODAY, 2);
-
-// a little message history
-sendSms('9824513306', 'k_reminder', 'm_reminder', { name: firstName(motherOf(kavita).name), date: visitsOf(kavita)[2].scheduledDate, village: { k: 'v_bakrol' } });
-S.sms[0].at = addDays(new Date(), -3);
-sendSms('u3', 'k_alert', 'm_alert', { name: motherOf(kavita).name, village: { k: 'v_bakrol' }, w: gestationalWeek(kavita), reasons: ['r_highbp'] }, true);
-S.sms[0].at = addDays(new Date(), -1);
+async function loadData() {
+  const [users, pregnancies, sms, rules, villages] = await Promise.all([
+    apiRequest('/users'), apiRequest('/pregnancies'), apiRequest('/sms'), apiRequest('/risk-rules'),
+    apiRequest('/villages')
+  ]);
+  S.users = users;
+  S.villages = villages;
+  S.pregnancies = pregnancies.map(p => ({
+    id: p.id, motherId: p.mother.id, lmp: dateFromApi(p.lmp), edd: dateFromApi(p.edd),
+    gravida: p.gravida, parity: p.parity, status: p.status, reviewed: p.reviewed,
+    notes: p.reviews.map(note => ({
+      at: dateFromApi(note.created_at), by: note.by_id, decision: note.decision, text: note.text
+    }))
+  }));
+  S.mothers = pregnancies.map(p => ({
+    id: p.mother.id, name: p.mother.name, age: p.mother.age, phone: p.mother.phone,
+    village: p.mother.village, bloodGroup: p.mother.blood_group, ashaId: p.mother.asha_id
+  }));
+  S.visits = pregnancies.flatMap(p => p.visits.map(visit => ({
+    id: visit.id, pregnancyId: visit.pregnancy_id, no: visit.no,
+    scheduledDate: dateFromApi(visit.scheduled_date), actualDate: dateFromApi(visit.actual_date),
+    weight: visit.weight, bpSys: visit.bp_sys, bpDia: visit.bp_dia,
+    hb: visit.hb, notes: visit.notes
+  })));
+  S.sms = sms.map(message => ({
+    at: new Date(message.created_at), to: message.recipient, kind: message.kind,
+    msg: message.message_key, vars: message.variables, alert: message.alert
+  }));
+  S.rules = rules.map(rule => ({
+    ...rule, param: ({ bp_sys: 'bpSys', bp_dia: 'bpDia' })[rule.param] || rule.param
+  }));
+}

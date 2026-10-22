@@ -2,28 +2,24 @@
 
 A clickable front-end prototype of a maternal (antenatal) care coordination system for primary health centres in India. It is built for the three people who run antenatal care in a village: the **ASHA worker** who registers pregnant women and records checkups, the **doctor** at the PHC who reviews high-risk cases, and the **PHC administrator** who tracks coverage. Mothers do not log in; they receive SMS reminders.
 
-This is the Software Engineering Lab semester project. This version is the prototype for Labs 1–5 (requirements, class design, interaction design and architecture). There is no backend yet: all data is sample data held in memory and resets when the page reloads.
+This is the Software Engineering Lab semester project. The frontend keeps the prototype's role-based screens and connects to a local FastAPI backend for persistent records.
 
 The whole interface can be switched between **English and Gujarati** with one click.
 
-## Running it
-
-Either:
-- open `index.html` in a browser, or
-- enable GitHub Pages for the repository (Settings → Pages → deploy from the `main` branch, root folder) and open the published link.
-
-## FastAPI backend
-
-The backend lives in `backend/` and provides a REST API for pregnancies, ANC visits, risk rules, PHC coverage, doctor reviews, and the simulated SMS log. The static frontend above remains the original in-memory prototype and is not connected to the API yet.
+## Running locally
 
 ```powershell
-py -m venv .venv
+python -m venv .venv
 .venv\Scripts\Activate.ps1
-py -m pip install -r requirements.txt
-py -m uvicorn backend.main:app --reload
+python -m pip install -r requirements.txt
+python -m uvicorn backend.main:app --reload
 ```
 
-Open `http://127.0.0.1:8000/docs` for the interactive API. The default SQLite database is created at `backend/anc.db`; copy `.env.example` to `.env` and set `DATABASE_URL` to use MySQL (`mysql+pymysql://...`). The API seeds staff accounts and editable risk thresholds on first startup, but does not seed any mother/pregnancy records. Run tests with `py -m pytest`.
+Open `http://127.0.0.1:8000/` to use the app and `http://127.0.0.1:8000/docs` for interactive API docs. FastAPI serves the frontend and API from the same origin; no second static server or CORS configuration is needed for local use.
+
+The backend lives in `backend/` and provides REST endpoints for pregnancies, ANC visits, supported villages, risk rules, PHC coverage, doctor reviews, and the simulated SMS log. SQLite is created at `backend/anc.db`; the API seeds staff, risk thresholds, and village names on first startup. On an empty database it also adds three clearly labeled fictional DEMO pregnancy records with synthetic measurements; existing mother records are left untouched. The registration form uses the supported-village list. The SMS page's reminder button runs the notification job, stores simulated messages in the database, and is safe to run repeatedly on the same day. No messages are sent to phones. The UI role tabs are demonstration-only, not authentication. Run tests with `python -m pytest`.
+
+To use MySQL, set `DATABASE_URL` in the environment before starting Uvicorn, for example `mysql+pymysql://anc_user:password@localhost:3306/anc`. Create the database first. `.env.example` documents the supported settings; `.env` files are not loaded automatically.
 
 This is a development backend, not a production clinical system: authentication and role-based authorization are not implemented, and SMS delivery is simulated. Risk thresholds are illustrative and are not clinical guidance.
 
@@ -47,15 +43,26 @@ Risk rules used by default (editable in the admin view): systolic BP ≥ 140, di
 index.html        page shell: header, navigation, language button
 css/style.css     all styles (light and dark)
 js/i18n.js        English and Gujarati strings, t() lookup, date formatting
-js/data.js        sample data and domain logic (schedule, risk check, notifications)
+js/data.js        API client and frontend data adapter
 js/app.js         screens for each role and event handling
 ```
 
 To add a string, add the same key to both `en` and `gu` in `js/i18n.js` and use `t('key')` in `app.js`.
 
+## Demo scenarios
+
+Use these walkthroughs to demonstrate how the frontend and backend work together. Seeded patient names and measurements are fictional demo data, not real health records.
+
+1. **Explore localized village data:** Open the ASHA screen, switch to Gujarati, and view the mothers. Village labels come from the API-backed village table. Open **Register pregnant woman** to see the supported village list; switch back to English and the same entries change language.
+2. **Register a pregnancy:** Submit the registration form with a supported village and a unique phone number. The API stores the mother and pregnancy, calculates the EDD, schedules ANC visits, and adds a registration entry to the SMS log. Reload the page to confirm the record persisted.
+3. **Record a high-risk visit:** Open a scheduled visit and enter systolic BP `146`, diastolic BP `94`, Hb `10.9`, and a weight. The backend stores the readings, applies the editable risk rules, flags the case for doctor review, and logs a simulated alert. Switch to the Doctor screen to review and save a referral or PHC decision.
+4. **Run visit reminders:** Open the SMS log and select **Run daily reminder job**. Visits due within three days produce a reminder; overdue visits produce notices for the mother and ASHA worker. Run the job again the same day to show it avoids duplicate notices.
+5. **Change a risk threshold:** Open the PHC admin screen and change a rule value. The backend persists the new value and risk assessments use it when the page reloads.
+
+The notification service is a local simulation: it persists message records in the SMS log but does not send texts to phones.
+
 ## Next steps
 
-- REST API and MySQL database behind the same screens (three-tier architecture from Lab 5)
 - Real login with role-based access
 - SMS gateway integration for reminders and alerts
 - Offline data entry and sync for ASHA workers (NFR3)

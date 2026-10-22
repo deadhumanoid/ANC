@@ -12,7 +12,10 @@ function go(page, opts = {}) {
 
 /* ---------- small helpers ---------- */
 const name = m => esc(L(m.name));
-const village = key => t('v_' + key);
+const village = key => {
+  const item = S.villages.find(entry => entry.id === key);
+  return esc(item ? L(item.name) : t('v_' + key));
+};
 const status = k => `<span class="st st-${k}">${t('s_' + k)}</span>`;
 const stats = items => `<p class="stats">${items.map(([n, key, cls]) =>
   `<span class="${cls || ''}"><b>${n}</b>${t(key)}</span>`).join('')}</p>`;
@@ -168,7 +171,7 @@ function renderRegister() {
       <label class="fld full">${t('gName')}<input id="g-name" required value="${LANG === 'gu' ? 'આશા ઠાકોર' : 'Asha Thakor'}"></label>
       <label class="fld">${t('gAge')}<input id="g-age" type="number" required min="12" max="55" value="23"></label>
       <label class="fld">${t('gPhone')}<input id="g-phone" required pattern="[6-9][0-9]{9}" inputmode="numeric" value="9825076143"></label>
-      <label class="fld">${t('gVillage')}<select id="g-village">${['bakrol', 'vadod'].map(v => `<option value="${v}">${village(v)}</option>`).join('')}</select></label>
+      <label class="fld">${t('gVillage')}<select id="g-village" required>${S.villages.map(v => `<option value="${esc(v.id)}">${village(v.id)}</option>`).join('')}</select></label>
       <label class="fld">${t('fBlood')}<select id="g-bg">${bloodGroups.map(b => `<option value="${b}">${b === 'Unknown' ? t('unknown') : b}</option>`).join('')}</select></label>
       <label class="fld">${t('fLmp')}<input id="g-lmp" type="date" required max="${iso(TODAY)}" value="${iso(addDays(TODAY, -63))}"></label>
       <div class="fld">${t('fGP')}
@@ -335,79 +338,89 @@ function registerMother() {
   const lmp = startOfDay(new Date(val('g-lmp') + 'T00:00'));
   if ((TODAY - lmp) / DAY > 40 * 7) return err(t('errLmp'));
 
-  const m = { id: newId('m'), name: val('g-name'), age: +val('g-age'), phone, village: val('g-village'), bloodGroup: val('g-bg'), ashaId: S.me.asha };
-  const p = { id: newId('p'), motherId: m.id, lmp, edd: addDays(lmp, 280), gravida: +val('g-g') || 1, parity: +val('g-p') || 0, status: 'active', reviewed: false, notes: [] };
-  S.mothers.push(m);
-  S.pregnancies.push(p);
-  const schedule = generateSchedule(p);
-  S.visits.push(...schedule);
-
-  sendSms(phone, 'k_reg', 'm_reg', { name: firstName(m.name), edd: p.edd, date: schedule[0].scheduledDate });
-  go('card', { pid: p.id });
-  toast(t('toastReg', { name: m.name, n: schedule.length }));
+  apiRequest('/pregnancies', {
+    method: 'POST',
+    body: JSON.stringify({
+      mother: {
+        name: val('g-name'), age: +val('g-age'), phone, village: val('g-village'),
+        blood_group: val('g-bg'), asha_id: S.me.asha
+      },
+      lmp: val('g-lmp'), gravida: +val('g-g') || 1, parity: +val('g-p') || 0
+    })
+  }).then(async pregnancy => {
+    await loadData();
+    go('card', { pid: pregnancy.id });
+    toast(t('toastReg', { name: pregnancy.mother.name, n: pregnancy.visits.length }));
+  }).catch(error => err(esc(error.message)));
 }
 
-function recordVisit(visitId) {
-  const v = S.visits.find(x => x.id === visitId);
-  const p = S.pregnancies.find(x => x.id === v.pregnancyId);
-  const m = motherOf(p);
+async function recordVisit(visitId) {
   const num = id => parseFloat(document.getElementById(id).value);
-
-  Object.assign(v, {
-    actualDate: TODAY, bpSys: num('f-sys'), bpDia: num('f-dia'), hb: num('f-hb'), weight: num('f-wt'),
-    notes: document.getElementById('f-notes').value.trim()
-  });
-
-  const a = assess(p);
-  if (a.level === 'high') {
-    p.reviewed = false;
-    sendSms(S.me.doctor, 'k_alert', 'm_alert', { name: m.name, village: { k: 'v_' + m.village }, w: gestationalWeek(p), reasons: a.reasons }, true);
+  try {
+    const result = await apiRequest(`/visits/${visitId}/record`, {
+      method: 'POST',
+      body: JSON.stringify({
+        bp_sys: num('f-sys'), bp_dia: num('f-dia'), hb: num('f-hb'), weight: num('f-wt'),
+        notes: document.getElementById('f-notes').value.trim()
+      })
+    });
+    await loadData();
+    const visit = S.visits.find(item => item.id === visitId);
+    go('card', { pid: visit.pregnancyId, flash: result.risk.level });
+  } catch (error) {
+    toast(esc(error.message));
   }
-  const next = nextVisit(p);
-  if (next) sendSms(m.phone, 'k_visit', 'm_visit', { name: firstName(m.name), date: next.scheduledDate });
-  else sendSms(m.phone, 'k_visit', 'm_visitLast', { name: firstName(m.name) });
-
-  go('card', { pid: p.id, flash: a.level });
 }
 
-function saveReview(pid) {
-  const p = S.pregnancies.find(x => x.id === pid), m = motherOf(p);
+async function saveReview(pid) {
   const note = document.getElementById('note-' + pid);
   const decision = document.getElementById('dec-' + pid).value;
   if (!note.value.trim()) { toast(t('needNote')); note.focus(); return; }
 
-  p.notes.push({ at: TODAY, by: S.me.doctor, decision, text: note.value.trim() });
-  p.reviewed = true;
-  if (decision === 'dRefer') sendSms(m.phone, 'k_referral', 'm_referral', { name: firstName(m.name) });
-  if (decision === 'dPhc') sendSms(m.phone, 'k_docvisit', 'm_docvisit', { name: firstName(m.name) });
-  sendSms(m.ashaId, 'k_docnote', 'm_docnote', { name: m.name, decision: { k: decision }, note: note.value.trim() });
-
-  render();
-  toast(t('toastReview', { name: m.name }));
+  try {
+    await apiRequest(`/pregnancies/${pid}/reviews`, {
+      method: 'POST',
+      body: JSON.stringify({ by_id: S.me.doctor, decision, text: note.value.trim() })
+    });
+    const pregnancy = S.pregnancies.find(item => item.id === pid);
+    const mother = motherOf(pregnancy);
+    await loadData();
+    render();
+    toast(t('toastReview', { name: mother.name }));
+  } catch (error) {
+    toast(esc(error.message));
+  }
 }
 
-// Daily job: remind mothers with a visit in the next 3 days, and report newly missed visits
-function runReminderJob() {
-  let reminders = 0, missedNotices = 0;
-  for (const p of activePregnancies()) {
-    const m = motherOf(p);
-    for (const v of visitsOf(p)) {
-      const st = visitStatus(v);
-      if (!v.actualDate && st !== 'missed' && (v.scheduledDate - TODAY) / DAY <= 3 && v.remindedOn !== +TODAY) {
-        v.remindedOn = +TODAY;
-        reminders++;
-        sendSms(m.phone, 'k_reminder', 'm_reminder', { name: firstName(m.name), date: v.scheduledDate, village: { k: 'v_' + m.village } });
-      }
-      if (st === 'missed' && !v.missedNotified) {
-        v.missedNotified = true;
-        missedNotices++;
-        sendSms(m.phone, 'k_missed', 'm_missed', { name: firstName(m.name), date: v.scheduledDate });
-        sendSms(m.ashaId, 'k_missed', 'm_missedAsha', { name: m.name, n: v.no, date: v.scheduledDate });
-      }
-    }
+async function runReminderJob() {
+  try {
+    const result = await apiRequest('/reminders/run', { method: 'POST' });
+    await loadData();
+    render();
+    toast(result.reminders_sent + result.missed_notices_sent
+      ? t('toastJob', { r: result.reminders_sent, m: result.missed_notices_sent })
+      : t('toastJobNone'));
+  } catch (error) {
+    toast(esc(error.message));
   }
-  render();
-  toast(reminders + missedNotices ? t('toastJob', { r: reminders, m: missedNotices }) : t('toastJobNone'));
+}
+
+function renderBackendError(error) {
+  main.innerHTML = `
+    <h1>${t('backendOfflineTitle')}</h1>
+    <p class="err">${t('backendOffline', { url: API_ROOT })}</p>
+    <p class="sub">${esc(error.message)}</p>
+    <button class="btn" id="retry-api">${t('backendRetry')}</button>`;
+}
+
+async function startApp() {
+  main.innerHTML = `<p class="empty">${t('backendConnecting')}</p>`;
+  try {
+    await loadData();
+    render();
+  } catch (error) {
+    renderBackendError(error);
+  }
 }
 
 let toastTimer;
@@ -423,6 +436,7 @@ function toast(html) {
 document.addEventListener('click', e => {
   const el = e.target.closest('button');
   if (!el) return;
+  if (el.id === 'retry-api') { startApp(); return; }
   if (el.id === 'lang') { setLang(LANG === 'en' ? 'gu' : 'en'); render(); return; }
   if (el.dataset.role) { S.role = el.dataset.role; go('home'); return; }
   if (el.dataset.go) { go(el.dataset.go); return; }
@@ -443,15 +457,20 @@ document.addEventListener('submit', e => {
   if (e.target.id === 'recform') recordVisit(e.target.dataset.visit);
 });
 
-document.addEventListener('change', e => {
+document.addEventListener('change', async e => {
   const id = e.target.dataset.rule;
   if (!id) return;
   const rule = S.rules.find(r => r.id === id);
   const value = parseFloat(e.target.value);
   if (isNaN(value)) return;
-  rule.value = value;
-  render();
-  toast(t('toastRule', { label: { k: 'p_' + rule.param }, op: opSymbol(rule.op), n: value, unit: { k: rule.unit } }));
+  try {
+    await apiRequest(`/risk-rules/${id}`, { method: 'PATCH', body: JSON.stringify({ value }) });
+    await loadData();
+    render();
+    toast(t('toastRule', { label: { k: 'p_' + rule.param }, op: opSymbol(rule.op), n: value, unit: { k: rule.unit } }));
+  } catch (error) {
+    toast(esc(error.message));
+  }
 });
 
-render();
+startApp();

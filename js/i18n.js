@@ -6,9 +6,12 @@ const STRINGS = {
     appName: 'Maternal Care Coordinator',
     phcName: 'PHC Bakrol',
     navAsha: 'ASHA worker', navDoctor: 'Doctor', navAdmin: 'PHC admin', navSms: 'SMS log',
-    protoNote: 'Prototype with sample data. The tabs stand in for login, and SMS messages are simulated. Data resets when the page reloads.',
+    protoNote: 'Connected to the local API. Seeded DEMO records are fictional; SMS is simulated and never sent to phones.',
+    backendConnecting: 'Connecting to local API…', backendOfflineTitle: 'Backend unavailable',
+    backendOffline: 'Could not reach {url}. Start the FastAPI server and retry.', backendRetry: 'Retry connection',
 
     v_bakrol: 'Bakrol', v_vadod: 'Vadod', v_gana: 'Gana',
+    v_vallabh_vidyanagar: 'Vallabh Vidyanagar', v_umreth: 'Umreth', v_petlad: 'Petlad',
 
     // statuses
     s_done: 'Completed', s_missed: 'Missed', s_due: 'Due this week', s_upcoming: 'Upcoming',
@@ -48,7 +51,7 @@ const STRINGS = {
     regSub: 'Creates her record, calculates the due date and schedules ANC visits.',
     gName: 'Full name', gAge: 'Age', gPhone: 'Mobile number', gVillage: 'Village',
     gGrav: 'Gravida', gPara: 'Para',
-    regHint: 'To see the duplicate check, try 9824513306. Kavita Solanki is already registered with it.',
+    regHint: 'Duplicate checks use active records already stored in the local database.',
     regSubmit: 'Register and schedule visits',
     errDup: '{name} is already registered with {phone} and has an active pregnancy. Open her record instead of registering again.',
     errLmp: 'That date is more than 40 weeks ago. Check the LMP.',
@@ -82,7 +85,7 @@ const STRINGS = {
     r_highbp: 'High BP', r_sevan: 'Severe anaemia', r_an: 'Anaemia', r_teen: 'Age under 18', r_old: 'Age over 35',
 
     // sms
-    hSms: 'SMS log', subSms: 'Every message the notification service sent, newest first. The gateway is simulated.',
+    hSms: 'SMS log', subSms: 'Simulated messages recorded by the notification service, newest first. Nothing is sent to phones.',
     runJob: 'Run daily reminder job', noSms: 'No messages yet.',
     colTime: 'Sent', colTo: 'To', colType: 'Type', colMsg: 'Message',
     toastJob: 'Reminders sent: {r}. Missed-visit notices sent: {m}.',
@@ -106,9 +109,12 @@ const STRINGS = {
     appName: 'માતૃ સંભાળ સંકલન',
     phcName: 'PHC બાકરોલ',
     navAsha: 'આશા કાર્યકર', navDoctor: 'ડૉક્ટર', navAdmin: 'PHC વહીવટકર્તા', navSms: 'SMS લોગ',
-    protoNote: 'નમૂના ડેટા સાથેનો પ્રોટોટાઇપ. ટૅબ લૉગિનનું કામ કરે છે અને SMS સંદેશા કાલ્પનિક છે. પેજ ફરી લોડ થતાં ડેટા શરૂઆતની સ્થિતિમાં આવી જાય છે.',
+    protoNote: 'સ્થાનિક API સાથે જોડાયેલું. DEMO રેકોર્ડ કાલ્પનિક છે; SMS માત્ર સિમ્યુલેશન છે અને ફોન પર મોકલાતાં નથી.',
+    backendConnecting: 'સ્થાનિક API સાથે જોડાઈ રહ્યું છે…', backendOfflineTitle: 'બેકએન્ડ ઉપલબ્ધ નથી',
+    backendOffline: '{url} સાથે જોડાઈ શક્યું નથી. FastAPI સર્વર શરૂ કરીને ફરી પ્રયાસ કરો.', backendRetry: 'ફરી જોડવાનો પ્રયાસ',
 
     v_bakrol: 'બાકરોલ', v_vadod: 'વડોદ', v_gana: 'ગાના',
+    v_vallabh_vidyanagar: 'વલ્લભ વિદ્યાનગર', v_umreth: 'ઉમરેઠ', v_petlad: 'પેટલાદ',
 
     s_done: 'પૂર્ણ', s_missed: 'ચૂકી ગયા', s_due: 'આ અઠવાડિયે', s_upcoming: 'આગામી',
     s_high: 'ઉચ્ચ જોખમ', s_moderate: 'મધ્યમ જોખમ', s_normal: 'સામાન્ય',
@@ -143,7 +149,7 @@ const STRINGS = {
     regSub: 'તેમનો રેકોર્ડ બનાવે છે, પ્રસૂતિ તારીખ ગણે છે અને ANC તપાસ નક્કી કરે છે.',
     gName: 'પૂરું નામ', gAge: 'ઉંમર', gPhone: 'મોબાઇલ નંબર', gVillage: 'ગામ',
     gGrav: 'ગ્રેવિડા', gPara: 'પેરા',
-    regHint: 'ડુપ્લિકેટ ચકાસણી જોવા 9824513306 નાખી જુઓ. કવિતા સોલંકી આ નંબરથી પહેલેથી નોંધાયેલા છે.',
+    regHint: 'ડુપ્લિકેટ ચકાસણી સ્થાનિક ડેટાબેઝમાં રહેલા ચાલુ રેકોર્ડ પરથી થાય છે.',
     regSubmit: 'નોંધણી કરો અને તપાસ નક્કી કરો',
     errDup: '{name} {phone} નંબરથી પહેલેથી નોંધાયેલા છે અને તેમની સગર્ભાવસ્થા ચાલુ છે. ફરી નોંધણી કરવાને બદલે તેમનો રેકોર્ડ ખોલો.',
     errLmp: 'આ તારીખ 40 અઠવાડિયાથી વધુ જૂની છે. LMP તપાસો.',
@@ -174,7 +180,7 @@ const STRINGS = {
     u_mmHg: 'mmHg', u_gdl: 'g/dL', u_yrs: 'વર્ષ',
     r_highbp: 'હાઈ BP', r_sevan: 'ગંભીર એનિમિયા', r_an: 'એનિમિયા', r_teen: '18 વર્ષથી ઓછી ઉંમર', r_old: '35 વર્ષથી વધુ ઉંમર',
 
-    hSms: 'SMS લોગ', subSms: 'નોટિફિકેશન સર્વિસે મોકલેલા બધા સંદેશા, નવા પહેલા. ગેટવે કાલ્પનિક છે.',
+    hSms: 'SMS લોગ', subSms: 'નોટિફિકેશન સર્વિસના સિમ્યુલેટેડ સંદેશા, નવા પહેલા. ફોન પર કંઈ મોકલાતું નથી.',
     runJob: 'દૈનિક રિમાઇન્ડર ચલાવો', noSms: 'હજુ કોઈ સંદેશ નથી.',
     colTime: 'મોકલ્યો', colTo: 'કોને', colType: 'પ્રકાર', colMsg: 'સંદેશ',
     toastJob: 'મોકલેલા રિમાઇન્ડર: {r}. ચૂકેલી તપાસની સૂચના: {m}.',

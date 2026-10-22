@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+# These request and response contracts validate API data independently of DB tables.
 class MotherCreate(BaseModel):
     name: str | dict[str, str]
     age: int = Field(ge=12, le=55)
@@ -35,6 +36,7 @@ class ReviewCreate(BaseModel):
 
 
 class RiskRuleUpdate(BaseModel):
+    # Keep administrator-edited thresholds within a broad, non-negative range.
     value: float = Field(ge=0, le=300)
 
 
@@ -48,6 +50,13 @@ class RiskRuleOut(BaseModel):
     unit: str
     sev: str
     reason: str
+
+
+class VillageOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: dict[str, str]
 
 
 class VisitOut(BaseModel):

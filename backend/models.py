@@ -7,6 +7,8 @@ from backend.database import Base
 
 
 class User(Base):
+    """Staff accounts used to assign ASHA workers, doctors, and administrators."""
+
     __tablename__ = "users"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
@@ -15,7 +17,18 @@ class User(Base):
     village: Mapped[str | None] = mapped_column(String(80))
 
 
+class Village(Base):
+    """Supported village keys and localized display names."""
+
+    __tablename__ = "villages"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    name: Mapped[dict] = mapped_column(JSON, nullable=False)
+
+
 class Mother(Base):
+    """Mother identity and contact details; names may contain English and Gujarati."""
+
     __tablename__ = "mothers"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
@@ -29,6 +42,8 @@ class Mother(Base):
 
 
 class Pregnancy(Base):
+    """One pregnancy record with its ANC visits and doctor reviews."""
+
     __tablename__ = "pregnancies"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
@@ -49,6 +64,8 @@ class Pregnancy(Base):
 
 
 class ANCVisit(Base):
+    """Scheduled or completed ANC contact and its recorded measurements."""
+
     __tablename__ = "anc_visits"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
@@ -67,6 +84,8 @@ class ANCVisit(Base):
 
 
 class RiskRule(Base):
+    """Editable threshold used by the domain risk-assessment logic."""
+
     __tablename__ = "risk_rules"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
@@ -79,6 +98,8 @@ class RiskRule(Base):
 
 
 class DoctorReview(Base):
+    """A doctor's decision and note attached to a pregnancy."""
+
     __tablename__ = "doctor_reviews"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
@@ -91,6 +112,8 @@ class DoctorReview(Base):
 
 
 class SmsLog(Base):
+    """Simulated notification record; this table does not send real SMS."""
+
     __tablename__ = "sms_logs"
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)

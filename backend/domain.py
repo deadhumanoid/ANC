@@ -4,7 +4,7 @@ from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.models import ANCVisit, Mother, Pregnancy, RiskRule, SmsLog
+from backend.models import ANCVisit, Mother, Pregnancy, RiskRule, SmsLog, Village
 
 
 ANC_WEEKS = (12, 20, 28, 36)
@@ -16,6 +16,14 @@ DEFAULT_RULES = (
     ("r5", "age", "<", 18, "u_yrs", "moderate", "r_teen"),
     ("r6", "age", ">", 35, "u_yrs", "moderate", "r_old"),
 )
+DEFAULT_VILLAGES = (
+    ("bakrol", {"en": "Bakrol", "gu": "બાકરોલ"}),
+    ("vadod", {"en": "Vadod", "gu": "વડોદ"}),
+    ("gana", {"en": "Gana", "gu": "ગાના"}),
+    ("vallabh_vidyanagar", {"en": "Vallabh Vidyanagar", "gu": "વલ્લભ વિદ્યાનગર"}),
+    ("umreth", {"en": "Umreth", "gu": "ઉમરેઠ"}),
+    ("petlad", {"en": "Petlad", "gu": "પેટલાદ"}),
+)
 
 
 def new_id(prefix: str) -> str:
@@ -23,11 +31,16 @@ def new_id(prefix: str) -> str:
 
 
 def seed_defaults(db: Session) -> None:
+    # Seed stable reference data and clearly labeled demo records for an empty install.
     if not db.get(RiskRule, "r1"):
         db.add_all([
             RiskRule(id=rule[0], param=rule[1], op=rule[2], value=rule[3], unit=rule[4], sev=rule[5], reason=rule[6])
             for rule in DEFAULT_RULES
         ])
+    for village_id, name in DEFAULT_VILLAGES:
+        if not db.get(Village, village_id):
+            db.add(Village(id=village_id, name=name))
+
     from backend.models import User
 
     users = (
@@ -40,6 +53,37 @@ def seed_defaults(db: Session) -> None:
         if not db.get(User, user_id):
             db.add(User(id=user_id, role=role, name=name, village=village))
     db.commit()
+
+    if db.scalar(select(Mother.id).limit(1)) is None:
+        today = date.today()
+        demo_mothers = (
+            ("demo_m1", {"en": "DEMO Meera Patel", "gu": "ડેમો મીરા પટેલ"}, 26, "9000000001", "bakrol", "u1", "O+"),
+            ("demo_m2", {"en": "DEMO Hetal Parmar", "gu": "ડેમો હેતલ પરમાર"}, 29, "9000000002", "vadod", "u1", "B+"),
+            ("demo_m3", {"en": "DEMO Nita Macwan", "gu": "ડેમો નીતા મેકવાન"}, 24, "9000000003", "gana", "u2", "A+"),
+        )
+        for mother_id, name, age, phone, village, asha_id, blood_group in demo_mothers:
+            lmp = today - timedelta(weeks=12)
+            edd = lmp + timedelta(days=280)
+            mother = Mother(
+                id=mother_id, name=name, age=age, phone=phone, village=village,
+                blood_group=blood_group, asha_id=asha_id,
+            )
+            pregnancy = Pregnancy(
+                id=f"demo_p{mother_id[-1]}", mother=mother, lmp=lmp, edd=edd,
+                gravida=1, parity=0, status="active", reviewed=False,
+            )
+            pregnancy.visits = [
+                ANCVisit(
+                    id=f"demo_v{mother_id[-1]}_{index}", no=index,
+                    scheduled_date=scheduled, actual_date=today if index == 1 else None,
+                    bp_sys=118 if index == 1 else None, bp_dia=76 if index == 1 else None,
+                    hb=11.2 if index == 1 else None, weight=54.0 if index == 1 else None,
+                    notes="Synthetic demo measurement; not a real patient record." if index == 1 else "",
+                )
+                for index, scheduled in enumerate(generate_schedule(lmp, edd, today), start=1)
+            ]
+            db.add(pregnancy)
+        db.commit()
 
 
 def send_sms(db: Session, recipient: str, kind: str, message_key: str, variables: dict, alert: bool = False) -> None:
@@ -77,6 +121,7 @@ def risk_hits(db: Session, mother: Mother, visit: ANCVisit | None) -> list[dict]
             hits.append({"id": rule.id, "param": rule.param, "sev": rule.sev, "reason": rule.reason, "value": value})
     return [
         hit for hit in hits
+        # A stricter high-risk rule replaces a moderate rule on the same reading.
         if not (hit["sev"] == "moderate" and any(
             other["param"] == hit["param"] and other["sev"] == "high" for other in hits
         ))
@@ -97,6 +142,7 @@ def generate_schedule(lmp: date, edd: date, today: date | None = None) -> list[d
     for week in ANC_WEEKS:
         scheduled = lmp + timedelta(weeks=week)
         if not dates:
+            # Never leave the first contact in the past after late registration.
             dates.append(max(scheduled, today))
         elif scheduled > dates[-1] + timedelta(days=14) and scheduled < edd:
             dates.append(scheduled)
