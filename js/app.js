@@ -132,9 +132,7 @@ function renderLanding() {
         </div>
       </section>
 
-      <section class="promise">
-        ${[1, 2, 3].map(n => `<div><strong>${t(`lP${n}T`)}</strong><p>${t(`lP${n}`)}</p></div>`).join('')}
-      </section>
+      
     </div>`;
 }
 
