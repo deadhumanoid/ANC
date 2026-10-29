@@ -1,7 +1,5 @@
 # Maternal Care Coordinator: Test Descriptions
 
-Oct 29, 2026 · @Sruja
-
 ## Unit tests
 
 Unit tests call one function or schema directly with fixed inputs, with no server involved.
