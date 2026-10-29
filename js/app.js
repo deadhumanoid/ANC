@@ -2,9 +2,11 @@
 // the registration form are separate pages reached from the ASHA or doctor view.
 
 const main = document.getElementById('main');
-const UI = { page: 'home', pid: null, visitId: null, flash: null };
+// The app opens on the landing page; choosing a role moves to that role's home screen.
+const UI = { page: 'landing', pid: null, visitId: null, flash: null };
 
 function go(page, opts = {}) {
+  // Reset transient page state unless the caller supplies a pregnancy or visit to open.
   Object.assign(UI, { page, pid: null, visitId: null, flash: null }, opts);
   render();
   window.scrollTo(0, 0);
@@ -12,7 +14,10 @@ function go(page, opts = {}) {
 
 /* ---------- small helpers ---------- */
 const name = m => esc(L(m.name));
-const village = key => t('v_' + key);
+const village = key => {
+  const item = S.villages.find(entry => entry.id === key);
+  return esc(item ? L(item.name) : t('v_' + key));
+};
 const status = k => `<span class="st st-${k}">${t('s_' + k)}</span>`;
 const stats = items => `<p class="stats">${items.map(([n, key, cls]) =>
   `<span class="${cls || ''}"><b>${n}</b>${t(key)}</span>`).join('')}</p>`;
@@ -33,17 +38,104 @@ function readings(v, hits = []) {
 
 /* ---------- render ---------- */
 function render() {
+  // Shared navigation and language labels are refreshed before the active screen is drawn.
   document.documentElement.lang = LANG;
   document.title = STRINGS[LANG].appName;
   document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = STRINGS[LANG][el.dataset.i18n]; });
   const langBtn = document.getElementById('lang');
   langBtn.textContent = LANG === 'en' ? 'ગુજરાતી' : 'English';
   langBtn.lang = LANG === 'en' ? 'gu' : 'en';
-  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.role === S.role));
+  // No tab is highlighted on the landing page because no role has been chosen yet.
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', UI.page !== 'landing' && b.dataset.role === S.role));
 
+  if (UI.page === 'landing') return renderLanding();
   if (UI.page === 'card') return renderCard();
   if (UI.page === 'register') return renderRegister();
   ({ asha: renderAsha, doctor: renderDoctor, admin: renderAdmin, sms: renderSms })[S.role]();
+}
+
+/* ---------- landing ---------- */
+// Raw string lookup for the one heading that carries <em> markup (t() escapes HTML).
+const raw = key => STRINGS[LANG][key] ?? STRINGS.en[key];
+
+const ICONS = {
+  asha: '<path d="M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10z"/>',
+  doctor: '<path d="M6 3v6a4 4 0 0 0 8 0V3M10 13v3a4 4 0 0 0 8 0v-2"/><circle cx="18" cy="12" r="2"/>',
+  admin: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  sms: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 10h8"/>'
+};
+const icon = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]}</svg>`;
+
+// The hero picture is the pregnancy timeline itself: four ANC checkups leading to the due date.
+function journeyArt() {
+  const nodes = [[44, 236, 12], [118, 186, 20], [192, 160, 28], [262, 116, 36]];
+  return `<svg viewBox="0 0 392 290" role="img" aria-label="${t('lJourney')}">
+    <circle class="art-sun" cx="322" cy="72" r="52"/>
+    <circle class="art-sun2" cx="322" cy="72" r="68"/>
+    <text class="art-title" x="20" y="34">${t('lJourney')}</text>
+    <path class="art-path" d="M44 236 C70 214 92 196 118 186 S166 168 192 160 S240 132 262 116 S306 84 322 70"/>
+    ${nodes.map(([x, y, w], i) => `
+      <circle class="art-node" cx="${x}" cy="${y}" r="17"/>
+      <text class="art-num" x="${x}" y="${y + 5}" text-anchor="middle">${i + 1}</text>
+      <text class="art-lbl" x="${x}" y="${y + 36}" text-anchor="middle">${t('wkShort', { n: w })}</text>`).join('')}
+    <circle class="art-end" cx="322" cy="70" r="22"/>
+    <path class="art-heart" transform="translate(322 72) scale(1.15)" d="M0 7C-10-1-9-11-3.5-11-1-11 0-9 0-8 0-9 1-11 3.5-11 9-11 10-1 0 7Z"/>
+    <text class="art-lbl" x="322" y="114" text-anchor="middle">${t('lBirth')}</text>
+  </svg>`;
+}
+
+function renderLanding() {
+  const pregs = activePregnancies();
+  const done = pregs.flatMap(visitsOf).filter(v => v.actualDate).length;
+  const roles = [['asha', 'navAsha', 'lAshaDesc'], ['doctor', 'navDoctor', 'lDocDesc'],
+                 ['admin', 'navAdmin', 'lAdminDesc'], ['sms', 'navSms', 'lSmsDesc']];
+
+  main.innerHTML = `
+    <div class="landing">
+      <div class="hero">
+        <div>
+          <p class="eyebrow">${t('lEyebrow')}</p>
+          <h1 class="display">${raw('lTitle')}</h1>
+          <p class="lede">${t('lLede')}</p>
+          <div class="actions">
+            <button class="btn btn-lg" data-role="asha">${t('lStart')}</button>
+            <button class="link" data-scroll="how">${t('lHow')}</button>
+          </div>
+        </div>
+        <div class="hero-art">${journeyArt()}</div>
+      </div>
+
+      ${stats([
+        [pregs.length, 'lStatPreg'],
+        [done, 'lStatDone'],
+        [S.villages.length, 'lStatVillages'],
+        [S.users.filter(u => u.role === 'asha').length, 'lStatAsha']
+      ])}
+
+      <section id="how">
+        <h2>${t('lHowTitle')}</h2>
+        <ol class="steps">
+          ${[1, 2, 3, 4].map(n => `<li><strong>${t(`lStep${n}T`)}</strong><p>${t(`lStep${n}`)}</p></li>`).join('')}
+        </ol>
+      </section>
+
+      <section>
+        <h2>${t('lRolesTitle')}</h2>
+        <div class="roles">
+          ${roles.map(([role, label, desc]) => `
+            <button class="role" data-role="${role}">
+              <span class="ico">${icon(role)}</span>
+              <strong>${t(label)}</strong>
+              <span class="d">${t(desc)}</span>
+              <span class="go" aria-hidden="true">→</span>
+            </button>`).join('')}
+        </div>
+      </section>
+
+      <section class="promise">
+        ${[1, 2, 3].map(n => `<div><strong>${t(`lP${n}T`)}</strong><p>${t(`lP${n}`)}</p></div>`).join('')}
+      </section>
+    </div>`;
 }
 
 /* ---------- ASHA worker ---------- */
@@ -95,6 +187,7 @@ function renderAsha() {
 function renderCard() {
   const p = S.pregnancies.find(x => x.id === UI.pid);
   const m = motherOf(p), a = assess(p), vs = visitsOf(p);
+  // A visit form is shown only after the user explicitly chooses an unrecorded visit.
   const recVisit = UI.visitId ? vs.find(v => v.id === UI.visitId) : null;
   const isAsha = S.role === 'asha';
 
@@ -159,6 +252,7 @@ function recordForm(v, p) {
 function renderRegister() {
   const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const bloodGroups = ['Unknown', 'A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
+  // Village options come from the API, keeping the registration form aligned with server validation.
   main.innerHTML = `
     <button class="link back" data-go="home">${t('back')}</button>
     <h1>${t('btnRegister')}</h1>
@@ -168,7 +262,7 @@ function renderRegister() {
       <label class="fld full">${t('gName')}<input id="g-name" required value="${LANG === 'gu' ? 'આશા ઠાકોર' : 'Asha Thakor'}"></label>
       <label class="fld">${t('gAge')}<input id="g-age" type="number" required min="12" max="55" value="23"></label>
       <label class="fld">${t('gPhone')}<input id="g-phone" required pattern="[6-9][0-9]{9}" inputmode="numeric" value="9825076143"></label>
-      <label class="fld">${t('gVillage')}<select id="g-village">${['bakrol', 'vadod'].map(v => `<option value="${v}">${village(v)}</option>`).join('')}</select></label>
+      <label class="fld">${t('gVillage')}<select id="g-village" required>${S.villages.map(v => `<option value="${esc(v.id)}">${village(v.id)}</option>`).join('')}</select></label>
       <label class="fld">${t('fBlood')}<select id="g-bg">${bloodGroups.map(b => `<option value="${b}">${b === 'Unknown' ? t('unknown') : b}</option>`).join('')}</select></label>
       <label class="fld">${t('fLmp')}<input id="g-lmp" type="date" required max="${iso(TODAY)}" value="${iso(addDays(TODAY, -63))}"></label>
       <div class="fld">${t('fGP')}
@@ -335,79 +429,91 @@ function registerMother() {
   const lmp = startOfDay(new Date(val('g-lmp') + 'T00:00'));
   if ((TODAY - lmp) / DAY > 40 * 7) return err(t('errLmp'));
 
-  const m = { id: newId('m'), name: val('g-name'), age: +val('g-age'), phone, village: val('g-village'), bloodGroup: val('g-bg'), ashaId: S.me.asha };
-  const p = { id: newId('p'), motherId: m.id, lmp, edd: addDays(lmp, 280), gravida: +val('g-g') || 1, parity: +val('g-p') || 0, status: 'active', reviewed: false, notes: [] };
-  S.mothers.push(m);
-  S.pregnancies.push(p);
-  const schedule = generateSchedule(p);
-  S.visits.push(...schedule);
-
-  sendSms(phone, 'k_reg', 'm_reg', { name: firstName(m.name), edd: p.edd, date: schedule[0].scheduledDate });
-  go('card', { pid: p.id });
-  toast(t('toastReg', { name: m.name, n: schedule.length }));
+  apiRequest('/pregnancies', {
+    method: 'POST',
+    body: JSON.stringify({
+      mother: {
+        name: val('g-name'), age: +val('g-age'), phone, village: val('g-village'),
+        blood_group: val('g-bg'), asha_id: S.me.asha
+      },
+      lmp: val('g-lmp'), gravida: +val('g-g') || 1, parity: +val('g-p') || 0
+    })
+  }).then(async pregnancy => {
+    await loadData();
+    go('card', { pid: pregnancy.id });
+    toast(t('toastReg', { name: pregnancy.mother.name, n: pregnancy.visits.length }));
+  }).catch(error => err(esc(error.message)));
 }
 
-function recordVisit(visitId) {
-  const v = S.visits.find(x => x.id === visitId);
-  const p = S.pregnancies.find(x => x.id === v.pregnancyId);
-  const m = motherOf(p);
+async function recordVisit(visitId) {
   const num = id => parseFloat(document.getElementById(id).value);
-
-  Object.assign(v, {
-    actualDate: TODAY, bpSys: num('f-sys'), bpDia: num('f-dia'), hb: num('f-hb'), weight: num('f-wt'),
-    notes: document.getElementById('f-notes').value.trim()
-  });
-
-  const a = assess(p);
-  if (a.level === 'high') {
-    p.reviewed = false;
-    sendSms(S.me.doctor, 'k_alert', 'm_alert', { name: m.name, village: { k: 'v_' + m.village }, w: gestationalWeek(p), reasons: a.reasons }, true);
+  try {
+    // The backend owns persistence and risk assessment; refresh before showing the updated card.
+    const result = await apiRequest(`/visits/${visitId}/record`, {
+      method: 'POST',
+      body: JSON.stringify({
+        bp_sys: num('f-sys'), bp_dia: num('f-dia'), hb: num('f-hb'), weight: num('f-wt'),
+        notes: document.getElementById('f-notes').value.trim()
+      })
+    });
+    await loadData();
+    const visit = S.visits.find(item => item.id === visitId);
+    go('card', { pid: visit.pregnancyId, flash: result.risk.level });
+  } catch (error) {
+    toast(esc(error.message));
   }
-  const next = nextVisit(p);
-  if (next) sendSms(m.phone, 'k_visit', 'm_visit', { name: firstName(m.name), date: next.scheduledDate });
-  else sendSms(m.phone, 'k_visit', 'm_visitLast', { name: firstName(m.name) });
-
-  go('card', { pid: p.id, flash: a.level });
 }
 
-function saveReview(pid) {
-  const p = S.pregnancies.find(x => x.id === pid), m = motherOf(p);
+async function saveReview(pid) {
   const note = document.getElementById('note-' + pid);
   const decision = document.getElementById('dec-' + pid).value;
   if (!note.value.trim()) { toast(t('needNote')); note.focus(); return; }
 
-  p.notes.push({ at: TODAY, by: S.me.doctor, decision, text: note.value.trim() });
-  p.reviewed = true;
-  if (decision === 'dRefer') sendSms(m.phone, 'k_referral', 'm_referral', { name: firstName(m.name) });
-  if (decision === 'dPhc') sendSms(m.phone, 'k_docvisit', 'm_docvisit', { name: firstName(m.name) });
-  sendSms(m.ashaId, 'k_docnote', 'm_docnote', { name: m.name, decision: { k: decision }, note: note.value.trim() });
-
-  render();
-  toast(t('toastReview', { name: m.name }));
+  try {
+    await apiRequest(`/pregnancies/${pid}/reviews`, {
+      method: 'POST',
+      body: JSON.stringify({ by_id: S.me.doctor, decision, text: note.value.trim() })
+    });
+    const pregnancy = S.pregnancies.find(item => item.id === pid);
+    const mother = motherOf(pregnancy);
+    await loadData();
+    render();
+    toast(t('toastReview', { name: mother.name }));
+  } catch (error) {
+    toast(esc(error.message));
+  }
 }
 
-// Daily job: remind mothers with a visit in the next 3 days, and report newly missed visits
-function runReminderJob() {
-  let reminders = 0, missedNotices = 0;
-  for (const p of activePregnancies()) {
-    const m = motherOf(p);
-    for (const v of visitsOf(p)) {
-      const st = visitStatus(v);
-      if (!v.actualDate && st !== 'missed' && (v.scheduledDate - TODAY) / DAY <= 3 && v.remindedOn !== +TODAY) {
-        v.remindedOn = +TODAY;
-        reminders++;
-        sendSms(m.phone, 'k_reminder', 'm_reminder', { name: firstName(m.name), date: v.scheduledDate, village: { k: 'v_' + m.village } });
-      }
-      if (st === 'missed' && !v.missedNotified) {
-        v.missedNotified = true;
-        missedNotices++;
-        sendSms(m.phone, 'k_missed', 'm_missed', { name: firstName(m.name), date: v.scheduledDate });
-        sendSms(m.ashaId, 'k_missed', 'm_missedAsha', { name: m.name, n: v.no, date: v.scheduledDate });
-      }
-    }
+async function runReminderJob() {
+  try {
+    // The backend checks due/missed visits and records simulated messages in the database.
+    const result = await apiRequest('/reminders/run', { method: 'POST' });
+    await loadData();
+    render();
+    toast(result.reminders_sent + result.missed_notices_sent
+      ? t('toastJob', { r: result.reminders_sent, m: result.missed_notices_sent })
+      : t('toastJobNone'));
+  } catch (error) {
+    toast(esc(error.message));
   }
-  render();
-  toast(reminders + missedNotices ? t('toastJob', { r: reminders, m: missedNotices }) : t('toastJobNone'));
+}
+
+function renderBackendError(error) {
+  main.innerHTML = `
+    <h1>${t('backendOfflineTitle')}</h1>
+    <p class="err">${t('backendOffline', { url: API_ROOT })}</p>
+    <p class="sub">${esc(error.message)}</p>
+    <button class="btn" id="retry-api">${t('backendRetry')}</button>`;
+}
+
+async function startApp() {
+  main.innerHTML = `<p class="empty">${t('backendConnecting')}</p>`;
+  try {
+    await loadData();
+    render();
+  } catch (error) {
+    renderBackendError(error);
+  }
 }
 
 let toastTimer;
@@ -421,11 +527,14 @@ function toast(html) {
 
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
+  // One delegated listener handles controls created dynamically during screen rendering.
   const el = e.target.closest('button');
   if (!el) return;
+  if (el.id === 'retry-api') { startApp(); return; }
   if (el.id === 'lang') { setLang(LANG === 'en' ? 'gu' : 'en'); render(); return; }
   if (el.dataset.role) { S.role = el.dataset.role; go('home'); return; }
   if (el.dataset.go) { go(el.dataset.go); return; }
+  if (el.dataset.scroll) { document.getElementById(el.dataset.scroll)?.scrollIntoView(); return; }
   if (el.dataset.open) { go('card', { pid: el.dataset.open }); return; }
   if (el.dataset.rec) {
     const v = S.visits.find(x => x.id === el.dataset.rec);
@@ -443,15 +552,20 @@ document.addEventListener('submit', e => {
   if (e.target.id === 'recform') recordVisit(e.target.dataset.visit);
 });
 
-document.addEventListener('change', e => {
+document.addEventListener('change', async e => {
   const id = e.target.dataset.rule;
   if (!id) return;
   const rule = S.rules.find(r => r.id === id);
   const value = parseFloat(e.target.value);
   if (isNaN(value)) return;
-  rule.value = value;
-  render();
-  toast(t('toastRule', { label: { k: 'p_' + rule.param }, op: opSymbol(rule.op), n: value, unit: { k: rule.unit } }));
+  try {
+    await apiRequest(`/risk-rules/${id}`, { method: 'PATCH', body: JSON.stringify({ value }) });
+    await loadData();
+    render();
+    toast(t('toastRule', { label: { k: 'p_' + rule.param }, op: opSymbol(rule.op), n: value, unit: { k: rule.unit } }));
+  } catch (error) {
+    toast(esc(error.message));
+  }
 });
 
-render();
+startApp();

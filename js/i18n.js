@@ -6,9 +6,12 @@ const STRINGS = {
     appName: 'Maternal Care Coordinator',
     phcName: 'PHC Bakrol',
     navAsha: 'ASHA worker', navDoctor: 'Doctor', navAdmin: 'PHC admin', navSms: 'SMS log',
-    protoNote: 'Prototype with sample data. The tabs stand in for login, and SMS messages are simulated. Data resets when the page reloads.',
+    protoNote: 'Connected to the local API. Seeded DEMO records are fictional; SMS is simulated and never sent to phones.',
+    backendConnecting: 'Connecting to local API…', backendOfflineTitle: 'Backend unavailable',
+    backendOffline: 'Could not reach {url}. Start the FastAPI server and retry.', backendRetry: 'Retry connection',
 
     v_bakrol: 'Bakrol', v_vadod: 'Vadod', v_gana: 'Gana',
+    v_vallabh_vidyanagar: 'Vallabh Vidyanagar', v_umreth: 'Umreth', v_petlad: 'Petlad',
 
     // statuses
     s_done: 'Completed', s_missed: 'Missed', s_due: 'Due this week', s_upcoming: 'Upcoming',
@@ -48,7 +51,7 @@ const STRINGS = {
     regSub: 'Creates her record, calculates the due date and schedules ANC visits.',
     gName: 'Full name', gAge: 'Age', gPhone: 'Mobile number', gVillage: 'Village',
     gGrav: 'Gravida', gPara: 'Para',
-    regHint: 'To see the duplicate check, try 9824513306. Kavita Solanki is already registered with it.',
+    regHint: 'Duplicate checks use active records already stored in the local database.',
     regSubmit: 'Register and schedule visits',
     errDup: '{name} is already registered with {phone} and has an active pregnancy. Open her record instead of registering again.',
     errLmp: 'That date is more than 40 weeks ago. Check the LMP.',
@@ -82,7 +85,7 @@ const STRINGS = {
     r_highbp: 'High BP', r_sevan: 'Severe anaemia', r_an: 'Anaemia', r_teen: 'Age under 18', r_old: 'Age over 35',
 
     // sms
-    hSms: 'SMS log', subSms: 'Every message the notification service sent, newest first. The gateway is simulated.',
+    hSms: 'SMS log', subSms: 'Simulated messages recorded by the notification service, newest first. Nothing is sent to phones.',
     runJob: 'Run daily reminder job', noSms: 'No messages yet.',
     colTime: 'Sent', colTo: 'To', colType: 'Type', colMsg: 'Message',
     toastJob: 'Reminders sent: {r}. Missed-visit notices sent: {m}.',
@@ -99,16 +102,40 @@ const STRINGS = {
     m_missedAsha: '{name} missed ANC {n} ({date}). Please follow up.',
     m_referral: '{name} ben, the doctor has referred you to CHC Anand. Your ASHA worker will help you get there.',
     m_docvisit: '{name} ben, please come to PHC Bakrol to see the doctor this week.',
-    m_docnote: '{name}: {decision}. {note}'
+    m_docnote: '{name}: {decision}. {note}',
+
+    // landing
+    lEyebrow: 'For PHC Bakrol and the villages it serves',
+    lTitle: 'Every checkup on time. <em>Every mother</em> looked after.',
+    lLede: 'One shared record for antenatal care. ASHA workers register mothers and record checkups, risk is flagged the moment a visit is saved, the PHC doctor reviews, and mothers get SMS reminders in Gujarati.',
+    lStart: 'Open the app', lHow: 'See how it works',
+    lStatPreg: 'mothers being followed', lStatDone: 'checkups recorded', lStatVillages: 'villages covered', lStatAsha: 'ASHA workers',
+    lHowTitle: 'How it works',
+    lStep1T: 'Register', lStep1: 'The ASHA worker enters her last period date. The due date and four ANC checkups are worked out for her.',
+    lStep2T: 'Check up', lStep2: 'At each visit she records BP, haemoglobin and weight. Risk rules run as soon as the visit is saved.',
+    lStep3T: 'Review', lStep3: 'High-risk cases go straight to the PHC doctor, who chooses routine care, a PHC visit or a referral.',
+    lStep4T: 'Remind', lStep4: 'Mothers get an SMS before each checkup, and the ASHA worker hears about any missed visit.',
+    lRolesTitle: 'Choose where to start',
+    lAshaDesc: 'Your mothers, who needs a visit this week, and recording checkups.',
+    lDocDesc: 'The high-risk queue, the watch list and your past reviews.',
+    lAdminDesc: 'Coverage by visit and by ASHA worker, and the risk thresholds.',
+    lSmsDesc: 'Every reminder and alert the system has sent.',
+    lJourney: 'The four checkups', lBirth: 'Due date', wkShort: '{n} wk',
+    lP1T: 'English and ગુજરાતી', lP1: 'The whole app switches language with one tap, including the SMS text.',
+    lP2T: 'Flags, not diagnoses', lP2: 'Rules point the doctor to cases worth a look. The doctor decides what happens next.',
+    lP3T: 'No app for mothers', lP3: 'Mothers only need a phone that can receive an SMS.'
   },
 
   gu: {
     appName: 'માતૃ સંભાળ સંકલન',
     phcName: 'PHC બાકરોલ',
     navAsha: 'આશા કાર્યકર', navDoctor: 'ડૉક્ટર', navAdmin: 'PHC વહીવટકર્તા', navSms: 'SMS લોગ',
-    protoNote: 'નમૂના ડેટા સાથેનો પ્રોટોટાઇપ. ટૅબ લૉગિનનું કામ કરે છે અને SMS સંદેશા કાલ્પનિક છે. પેજ ફરી લોડ થતાં ડેટા શરૂઆતની સ્થિતિમાં આવી જાય છે.',
+    protoNote: 'સ્થાનિક API સાથે જોડાયેલું. DEMO રેકોર્ડ કાલ્પનિક છે; SMS માત્ર સિમ્યુલેશન છે અને ફોન પર મોકલાતાં નથી.',
+    backendConnecting: 'સ્થાનિક API સાથે જોડાઈ રહ્યું છે…', backendOfflineTitle: 'બેકએન્ડ ઉપલબ્ધ નથી',
+    backendOffline: '{url} સાથે જોડાઈ શક્યું નથી. FastAPI સર્વર શરૂ કરીને ફરી પ્રયાસ કરો.', backendRetry: 'ફરી જોડવાનો પ્રયાસ',
 
     v_bakrol: 'બાકરોલ', v_vadod: 'વડોદ', v_gana: 'ગાના',
+    v_vallabh_vidyanagar: 'વલ્લભ વિદ્યાનગર', v_umreth: 'ઉમરેઠ', v_petlad: 'પેટલાદ',
 
     s_done: 'પૂર્ણ', s_missed: 'ચૂકી ગયા', s_due: 'આ અઠવાડિયે', s_upcoming: 'આગામી',
     s_high: 'ઉચ્ચ જોખમ', s_moderate: 'મધ્યમ જોખમ', s_normal: 'સામાન્ય',
@@ -143,7 +170,7 @@ const STRINGS = {
     regSub: 'તેમનો રેકોર્ડ બનાવે છે, પ્રસૂતિ તારીખ ગણે છે અને ANC તપાસ નક્કી કરે છે.',
     gName: 'પૂરું નામ', gAge: 'ઉંમર', gPhone: 'મોબાઇલ નંબર', gVillage: 'ગામ',
     gGrav: 'ગ્રેવિડા', gPara: 'પેરા',
-    regHint: 'ડુપ્લિકેટ ચકાસણી જોવા 9824513306 નાખી જુઓ. કવિતા સોલંકી આ નંબરથી પહેલેથી નોંધાયેલા છે.',
+    regHint: 'ડુપ્લિકેટ ચકાસણી સ્થાનિક ડેટાબેઝમાં રહેલા ચાલુ રેકોર્ડ પરથી થાય છે.',
     regSubmit: 'નોંધણી કરો અને તપાસ નક્કી કરો',
     errDup: '{name} {phone} નંબરથી પહેલેથી નોંધાયેલા છે અને તેમની સગર્ભાવસ્થા ચાલુ છે. ફરી નોંધણી કરવાને બદલે તેમનો રેકોર્ડ ખોલો.',
     errLmp: 'આ તારીખ 40 અઠવાડિયાથી વધુ જૂની છે. LMP તપાસો.',
@@ -174,7 +201,7 @@ const STRINGS = {
     u_mmHg: 'mmHg', u_gdl: 'g/dL', u_yrs: 'વર્ષ',
     r_highbp: 'હાઈ BP', r_sevan: 'ગંભીર એનિમિયા', r_an: 'એનિમિયા', r_teen: '18 વર્ષથી ઓછી ઉંમર', r_old: '35 વર્ષથી વધુ ઉંમર',
 
-    hSms: 'SMS લોગ', subSms: 'નોટિફિકેશન સર્વિસે મોકલેલા બધા સંદેશા, નવા પહેલા. ગેટવે કાલ્પનિક છે.',
+    hSms: 'SMS લોગ', subSms: 'નોટિફિકેશન સર્વિસના સિમ્યુલેટેડ સંદેશા, નવા પહેલા. ફોન પર કંઈ મોકલાતું નથી.',
     runJob: 'દૈનિક રિમાઇન્ડર ચલાવો', noSms: 'હજુ કોઈ સંદેશ નથી.',
     colTime: 'મોકલ્યો', colTo: 'કોને', colType: 'પ્રકાર', colMsg: 'સંદેશ',
     toastJob: 'મોકલેલા રિમાઇન્ડર: {r}. ચૂકેલી તપાસની સૂચના: {m}.',
@@ -191,7 +218,27 @@ const STRINGS = {
     m_missedAsha: '{name} ANC {n} ({date}) ચૂકી ગયા છે. કૃપા કરી ફોલો-અપ કરો.',
     m_referral: '{name} બેન, ડૉક્ટરે તમને CHC આણંદ રિફર કર્યા છે. તમારા આશા કાર્યકર તમને ત્યાં પહોંચવામાં મદદ કરશે.',
     m_docvisit: '{name} બેન, કૃપા કરી આ અઠવાડિયે ડૉક્ટરને મળવા PHC બાકરોલ આવજો.',
-    m_docnote: '{name}: {decision}. {note}'
+    m_docnote: '{name}: {decision}. {note}',
+
+    lEyebrow: 'PHC બાકરોલ અને તેના ગામો માટે',
+    lTitle: 'દરેક તપાસ સમયસર. <em>દરેક માતા</em>ની સંભાળ.',
+    lLede: 'પ્રસૂતિ પૂર્વ સંભાળ માટે એક જ સહિયારો રેકોર્ડ. આશા કાર્યકર માતાની નોંધણી કરે અને તપાસ નોંધે, તપાસ સચવાતાં જ જોખમ ચકાસાય, PHC ડૉક્ટર સમીક્ષા કરે, અને માતાઓને ગુજરાતીમાં SMS યાદી મળે.',
+    lStart: 'એપ ખોલો', lHow: 'કેવી રીતે કામ કરે છે',
+    lStatPreg: 'માતાઓની સંભાળ ચાલુ', lStatDone: 'તપાસ નોંધાઈ', lStatVillages: 'ગામો', lStatAsha: 'આશા કાર્યકરો',
+    lHowTitle: 'કેવી રીતે કામ કરે છે',
+    lStep1T: 'નોંધણી', lStep1: 'આશા કાર્યકર છેલ્લા માસિકની તારીખ લખે. પ્રસૂતિ તારીખ અને ચાર ANC તપાસ આપોઆપ નક્કી થાય.',
+    lStep2T: 'તપાસ', lStep2: 'દરેક મુલાકાતે BP, હિમોગ્લોબિન અને વજન નોંધાય. તપાસ સચવાતાં જ જોખમ નિયમો ચકાસાય.',
+    lStep3T: 'સમીક્ષા', lStep3: 'ઉચ્ચ જોખમવાળા કેસ સીધા PHC ડૉક્ટર પાસે જાય, જે નિયમિત સંભાળ, PHC મુલાકાત કે રિફરલ નક્કી કરે.',
+    lStep4T: 'યાદી', lStep4: 'દરેક તપાસ પહેલાં માતાને SMS મળે, અને તપાસ ચૂકાય તો આશા કાર્યકરને જાણ થાય.',
+    lRolesTitle: 'ક્યાંથી શરૂ કરવું છે?',
+    lAshaDesc: 'તમારી માતાઓ, આ અઠવાડિયે કોની તપાસ બાકી છે, અને તપાસ નોંધવી.',
+    lDocDesc: 'ઉચ્ચ જોખમ યાદી, નજર યાદી અને તમારી અગાઉની સમીક્ષાઓ.',
+    lAdminDesc: 'તપાસ અને આશા કાર્યકર પ્રમાણે કવરેજ, અને જોખમ મર્યાદાઓ.',
+    lSmsDesc: 'સિસ્ટમે મોકલેલી દરેક યાદી અને ચેતવણી.',
+    lJourney: 'ચાર તપાસ', lBirth: 'પ્રસૂતિ તારીખ', wkShort: '{n} અઠ.',
+    lP1T: 'English અને ગુજરાતી', lP1: 'એક ક્લિકમાં આખી એપની ભાષા બદલાય, SMS સહિત.',
+    lP2T: 'ચેતવણી, નિદાન નહીં', lP2: 'નિયમો ડૉક્ટરને જોવા જેવા કેસ બતાવે છે. આગળ શું કરવું તે ડૉક્ટર નક્કી કરે.',
+    lP3T: 'માતાઓ માટે એપ નહીં', lP3: 'માતાઓને ફક્ત SMS આવી શકે એવો ફોન જોઈએ.'
   }
 };
 

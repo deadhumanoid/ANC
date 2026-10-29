@@ -6,13 +6,20 @@
   <title>Maternal Care Coordinator</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Vadodara:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Hind+Vadodara:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <header class="site">
     <div class="inner">
-      <div class="brand"><strong data-i18n="appName"></strong><span data-i18n="phcName"></span></div>
+      <button class="brand" data-go="landing">
+        <svg viewBox="0 0 34 34" aria-hidden="true">
+          <circle cx="17" cy="17" r="16" style="fill:var(--sun-soft)"/>
+          <circle cx="14" cy="15" r="7.5" style="fill:var(--accent)"/>
+          <circle cx="21.5" cy="20.5" r="5" style="fill:var(--sun)"/>
+        </svg>
+        <span><strong data-i18n="appName"></strong><span class="brand-sub" data-i18n="phcName"></span></span>
+      </button>
       <nav id="nav">
         <button data-role="asha" data-i18n="navAsha"></button>
         <button data-role="doctor" data-i18n="navDoctor"></button>
